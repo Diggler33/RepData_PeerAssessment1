@@ -1,4 +1,9 @@
-# Reproducible Research: Peer Assessment 1
+---
+title: "Reproducible Research: Peer Assessment 1"
+output: 
+  html_document:
+    keep_md: true
+---
 
 
 ## Loading and preprocessing the data
@@ -32,7 +37,7 @@ In this section I display a Histogram using the aggregated dataset and the Mean 
 hist(activity_Agg$steps, main="Frequency of Steps",xlab="Steps")
 ```
 
-![](./PA1_template_files/figure-html/unnamed-chunk-2-1.png) 
+![plot of chunk unnamed-chunk-2](figure/unnamed-chunk-2-1.png) 
 
 ```r
 #Display Mean and Median of total steps over all days
@@ -50,29 +55,27 @@ SummaryResults
 ## What is the average daily activity pattern?  
 
 This section calculates the men for the steps over intervals for all days. A time plot is then displayed with these outputs.
-To ensure the data displays in a readable format, I am displaying the "intervals"" on the x axis in 100 intervals
+I have used POSIXct to convert the intervals into a time format for accuracy of plotting.
 
 ```r
-#Get average steps taken over intervals
-avg.daily.pattern <- aggregate(activity$steps,list(interval = activity$interval),FUN=mean,na.rm=TRUE)
-names(avg.daily.pattern) <- c("interval","steps")
+substrRight <- function(x, n){
+        substr(x, nchar(x)-n+1, nchar(x))
+}
 
-#set the x axis sequence
 
-at <- seq(from = 0, to = 2400, by = 100)
+#----- FORMAT DATES -------#
+dFormat <- "%Y-%m-%d %H%M"
+activity$Date.Time <-as.POSIXct(paste(activity$date,substrRight(paste("0000",activity$interval,sep=""),4)), format=dFormat)
+activity$time <- strftime(activity$Date.Time, format="%H:%M:%S")
+activity$time <- strptime(activity$time, format="%H:%M:%S")
+activity$time <- as.POSIXct(activity$time,format=dFormat)
 
-#Time series plot (i.e. type = "l") of the 5-minute interval (x-axis) 
-#and the average number of steps taken, averaged across all days (y-axis)
-plot(avg.daily.pattern$interval,avg.daily.pattern$steps,type = "l",ylab = "Steps", main = "Average Daily Activity Pattern", xlab = "Interval",xaxt = "n")
-axis(side = 1, at = at, las = 2, hadj = 0.9)
+
+avg.daily.pattern <- aggregate(steps ~ time, data = activity,mean)
+plot(avg.daily.pattern,type = "l",ylab = "Steps", main = "Average Daily Activity Pattern", xlab = "Interval")
 ```
 
-![](./PA1_template_files/figure-html/unnamed-chunk-3-1.png) 
-
-```r
-rm(avg.daily.pattern)
-rm(at)
-```
+![plot of chunk unnamed-chunk-3](figure/unnamed-chunk-3-1.png) 
 
 ## Imputing missing values  
 
@@ -92,7 +95,15 @@ summary(activity)
 ##  Mean   : 37.38                      Mean   :1177.5  
 ##  3rd Qu.: 12.00                      3rd Qu.:1766.2  
 ##  Max.   :806.00                      Max.   :2355.0  
-##  NA's   :2304
+##  NA's   :2304                                        
+##    Date.Time                        time                    
+##  Min.   :2012-10-01 00:00:00   Min.   :2014-11-11 00:00:00  
+##  1st Qu.:2012-10-16 05:58:45   1st Qu.:2014-11-11 05:58:45  
+##  Median :2012-10-31 11:57:30   Median :2014-11-11 11:57:30  
+##  Mean   :2012-10-31 11:30:52   Mean   :2014-11-11 11:57:30  
+##  3rd Qu.:2012-11-15 17:56:15   3rd Qu.:2014-11-11 17:56:15  
+##  Max.   :2012-11-30 23:55:00   Max.   :2014-11-11 23:55:00  
+## 
 ```
 
 We can see from this that there are 2304 NAs present in the "Steps" data.
@@ -111,20 +122,21 @@ To address this I have taken the following steps:
 ```r
 #Get Mean Value for each interval over all days  to impute NAs
 avg.daily.pattern <- aggregate(activity$steps,list(interval = activity$interval),FUN=mean,na.rm=TRUE)
-
+names(avg.daily.pattern) <- c("interval","mean_steps")
 missing <- is.na(activity$steps)                                #Identify NAs
 notmissing <- !is.na(activity$steps)                            #Identify non NAs
 activity.missing <- activity[missing,]                          #Subset data for NAs
 
 #Merge missing data with mean values
 activity.missing <- merge(activity.missing,avg.daily.pattern,by.x = "interval",by.y = "interval")
-names(activity.missing) <- c("interval","steps","date","mean_steps")
+
 
 #Set NAs equal to mean value
 activity.missing$steps <- activity.missing$mean_steps
 
+
 #Bind imputed rows with non NA rows
-master <- rbind(activity.missing[,c(1,2,3)],activity[notmissing,])
+master <- rbind(activity.missing[,c(2,3,1,4,5)],activity[notmissing,])
 master$date <-as.Date(master$date)                              #FormatDate
 
 master <- master[order(master$date),]                           #Order data by date
@@ -137,7 +149,7 @@ hist(activity_Agg$steps, main="Total Steps (NA Ignored)",xlab="Steps")
 hist(master_Agg$steps, main="Total Steps (NA Imputed)",xlab="Steps") 
 ```
 
-![](./PA1_template_files/figure-html/unnamed-chunk-5-1.png) 
+![plot of chunk unnamed-chunk-5](figure/unnamed-chunk-5-1.png) 
 
 ```r
 #Display Mean and Median comparisons for both Imputed and previous datasets
@@ -145,8 +157,8 @@ NA_Handling <- c("Ignored","Imputed")
 Mean <- c(round(mean(activity_Agg$steps),2),round(mean(master_Agg$steps),2))
 Median <- c(round(median(activity_Agg$steps),2),round(median(master_Agg$steps),2))
 Summaryresults <- data.frame(cbind(NA_Handling,Mean,Median))
-                      
-                      Summaryresults                                                  #View results
+
+Summaryresults                                                  #View results
 ```
 
 ```
@@ -157,3 +169,29 @@ Summaryresults <- data.frame(cbind(NA_Handling,Mean,Median))
 
 
 ## Are there differences in activity patterns between weekdays and weekends?
+
+
+```r
+#----------------------------------------------------------------------------------------------------------
+## Activity patterns between weekdays and weekends
+#----------------------------------------------------------------------------------------------------------
+
+library(lattice)
+
+
+activity$date <- as.Date(activity$date)
+weekend <- weekdays(activity$date) %in% c("Saturday","Sunday")
+weekend.f <- factor(weekend, labels = c("Weekday","Weekend"))
+activity$Weekday <- weekend.f
+
+
+Weekday_Agg <- aggregate(steps ~ time + Weekday, data = activity,mean)
+
+xyplot(steps ~ time|Weekday,data=Weekday_Agg,type = "l",layout= c(1,2))
+```
+
+![plot of chunk unnamed-chunk-6](figure/unnamed-chunk-6-1.png) 
+
+```r
+#----------------------------------------------------------------------------------------------------------
+```

@@ -47,22 +47,24 @@ SummaryResults
 ## What is the average daily activity pattern?  
 
 This section calculates the men for the steps over intervals for all days. A time plot is then displayed with these outputs.
-To ensure the data displays in a readable format, I am displaying the "intervals"" on the x axis in 100 intervals
+I have used POSIXct to convert the intervals into a time format for accuracy of plotting.
 ```{r}
-#Get average steps taken over intervals
-avg.daily.pattern <- aggregate(activity$steps,list(interval = activity$interval),FUN=mean,na.rm=TRUE)
-names(avg.daily.pattern) <- c("interval","steps")
+substrRight <- function(x, n){
+        substr(x, nchar(x)-n+1, nchar(x))
+}
 
-#set the x axis sequence
 
-at <- seq(from = 0, to = 2400, by = 100)
+#----- FORMAT DATES -------#
+dFormat <- "%Y-%m-%d %H%M"
+activity$Date.Time <-as.POSIXct(paste(activity$date,substrRight(paste("0000",activity$interval,sep=""),4)), format=dFormat)
+activity$time <- strftime(activity$Date.Time, format="%H:%M:%S")
+activity$time <- strptime(activity$time, format="%H:%M:%S")
+activity$time <- as.POSIXct(activity$time,format=dFormat)
 
-#Time series plot (i.e. type = "l") of the 5-minute interval (x-axis) 
-#and the average number of steps taken, averaged across all days (y-axis)
-plot(avg.daily.pattern$interval,avg.daily.pattern$steps,type = "l",ylab = "Steps", main = "Average Daily Activity Pattern", xlab = "Interval",xaxt = "n")
-axis(side = 1, at = at, las = 2, hadj = 0.9)
-rm(avg.daily.pattern)
-rm(at)
+
+avg.daily.pattern <- aggregate(steps ~ time, data = activity,mean)
+plot(avg.daily.pattern,type = "l",ylab = "Steps", main = "Average Daily Activity Pattern", xlab = "Interval")
+
 ```
 
 ## Imputing missing values  
@@ -91,20 +93,21 @@ To address this I have taken the following steps:
 
 #Get Mean Value for each interval over all days  to impute NAs
 avg.daily.pattern <- aggregate(activity$steps,list(interval = activity$interval),FUN=mean,na.rm=TRUE)
-
+names(avg.daily.pattern) <- c("interval","mean_steps")
 missing <- is.na(activity$steps)                                #Identify NAs
 notmissing <- !is.na(activity$steps)                            #Identify non NAs
 activity.missing <- activity[missing,]                          #Subset data for NAs
 
 #Merge missing data with mean values
 activity.missing <- merge(activity.missing,avg.daily.pattern,by.x = "interval",by.y = "interval")
-names(activity.missing) <- c("interval","steps","date","mean_steps")
+
 
 #Set NAs equal to mean value
 activity.missing$steps <- activity.missing$mean_steps
 
+
 #Bind imputed rows with non NA rows
-master <- rbind(activity.missing[,c(1,2,3)],activity[notmissing,])
+master <- rbind(activity.missing[,c(2,3,1,4,5)],activity[notmissing,])
 master$date <-as.Date(master$date)                              #FormatDate
 
 master <- master[order(master$date),]                           #Order data by date
@@ -121,10 +124,31 @@ NA_Handling <- c("Ignored","Imputed")
 Mean <- c(round(mean(activity_Agg$steps),2),round(mean(master_Agg$steps),2))
 Median <- c(round(median(activity_Agg$steps),2),round(median(master_Agg$steps),2))
 Summaryresults <- data.frame(cbind(NA_Handling,Mean,Median))
-                      
-                      Summaryresults                                                  #View results
+
+Summaryresults                                                  #View results
 
 ```
 
 
 ## Are there differences in activity patterns between weekdays and weekends?
+
+```{r}
+#----------------------------------------------------------------------------------------------------------
+## Activity patterns between weekdays and weekends
+#----------------------------------------------------------------------------------------------------------
+
+library(lattice)
+
+
+activity$date <- as.Date(activity$date)
+weekend <- weekdays(activity$date) %in% c("Saturday","Sunday")
+weekend.f <- factor(weekend, labels = c("Weekday","Weekend"))
+activity$Weekday <- weekend.f
+
+
+Weekday_Agg <- aggregate(steps ~ time + Weekday, data = activity,mean)
+
+xyplot(steps ~ time|Weekday,data=Weekday_Agg,type = "l",layout= c(1,2))
+
+#----------------------------------------------------------------------------------------------------------
+```
