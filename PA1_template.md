@@ -8,6 +8,13 @@ output:
 
 ## Loading and preprocessing the data
 
+loading required packages
+
+```r
+library(ggplot2)
+library(lattice)
+```
+
 The data used for this analysis can be downloaded from the following location:
 
 * [Activity monitoring data](https://d396qusza40orc.cloudfront.net/repdata%2Fdata%2Factivity.zip)
@@ -20,16 +27,31 @@ This code block does the following steps:
 
 note: NAs are ignored in this section
 
+### 1. Load data
 
 ```r
-activity <- read.csv("C:/Users/ben33_000/Documents/DataScientistTraining/ReproducibleResearch/Assignment01/RepData_PeerAssessment1/activity.csv",header=TRUE,sep=",",stringsAsFactors=FALSE,strip.white = TRUE)
+#Data Source
+datafile <- 'https://d396qusza40orc.cloudfront.net/repdata%2Fdata%2Factivity.zip'
+
+#Download file if required
+if (file.exists('activity.zip') == FALSE) {
+        download.file(datafile, dest='activity.zip') }
+
+#unzip data
+unzip("activity.zip", overwrite = T, unzip="internal")
+
+#Read csv Data into data frame
+activity<-read.csv("activity.csv",header=TRUE,sep=",",stringsAsFactors=FALSE,strip.white = TRUE)
+```
+### Aggregate Data
+
+```r
 activity_Agg <- aggregate(steps ~ date, data = activity,sum,na.rm=TRUE)
 ```
 
-
 ## What is mean total number of steps taken per day?  
 
-In this section I display a Histogram using the aggregated dataset and the Mean and Median values of the Total steps taken for each day.
+The following Histogram uses the aggregated dataset to report total steps taken for each day
 
 
 ```r
@@ -37,7 +59,9 @@ In this section I display a Histogram using the aggregated dataset and the Mean 
 hist(activity_Agg$steps, main="Frequency of Steps",xlab="Steps")
 ```
 
-![plot of chunk unnamed-chunk-2](figure/unnamed-chunk-2-1.png) 
+![plot of chunk unnamed-chunk-4](figure/unnamed-chunk-4-1.png) 
+
+To determine the Mean and Median values the following code is used.
 
 ```r
 #Display Mean and Median of total steps over all days
@@ -54,7 +78,7 @@ SummaryResults
 
 ## What is the average daily activity pattern?  
 
-This section calculates the men for the steps over intervals for all days. A time plot is then displayed with these outputs.
+This section calculates the mean for the steps over intervals for all days. A time plot is then displayed with these outputs.
 I have used POSIXct to convert the intervals into a time format for accuracy of plotting.
 
 ```r
@@ -66,16 +90,29 @@ substrRight <- function(x, n){
 #----- FORMAT DATES -------#
 dFormat <- "%Y-%m-%d %H%M"
 activity$Date.Time <-as.POSIXct(paste(activity$date,substrRight(paste("0000",activity$interval,sep=""),4)), format=dFormat)
-activity$time <- strftime(activity$Date.Time, format="%H:%M:%S")
-activity$time <- strptime(activity$time, format="%H:%M:%S")
-activity$time <- as.POSIXct(activity$time,format=dFormat)
+activity$Time <-strftime(activity$Date.Time, format="%H:%M:%S")
+        
+avg.daily.pattern <- aggregate(steps ~ Time, data = activity,mean)
+
+avg.daily.pattern$Row <- as.numeric(rownames(avg.daily.pattern))
+
+Mean.Max <- avg.daily.pattern[avg.daily.pattern$steps == max(avg.daily.pattern$steps),]
+Mean.Max$Time <- as.character(Mean.Max$Time)
 
 
-avg.daily.pattern <- aggregate(steps ~ time, data = activity,mean)
-plot(avg.daily.pattern,type = "l",ylab = "Steps", main = "Average Daily Activity Pattern", xlab = "Interval")
+ggplot(avg.daily.pattern, aes(x=as.numeric(rownames(avg.daily.pattern)), y=steps)) +
+        geom_line() + scale_x_continuous(breaks=seq(1,nrow(avg.daily.pattern),by=48), labels=avg.daily.pattern$Time[seq(1,nrow(avg.daily.pattern),by=48)]) +
+        geom_hline(yintercept=max(avg.daily.pattern$steps), colour="red", linetype=5) +
+        geom_vline(xintercept=Mean.Max[[3]], colour="red", linetype=5) +
+        geom_text(mapping=aes(0,y=Mean.Max[[2]], label = round(Mean.Max[[2]],2),hjust=-0.2, vjust=-0.5),size = 3) +
+        geom_text(aes(Mean.Max[[3]],0, label = Mean.Max[[1]], hjust=-0.2),size = 3) +
+        xlab("Interval") + ylab("Avg Steps Per Interval") + xlab("Interval") +
+        ggtitle("Average Daily Activity Pattern") +theme_bw()
 ```
 
-![plot of chunk unnamed-chunk-3](figure/unnamed-chunk-3-1.png) 
+![plot of chunk unnamed-chunk-6](figure/unnamed-chunk-6-1.png) 
+
+From this we can see, on average the 08:35 interval contains the maximum number of steps (206.17)
 
 ## Imputing missing values  
 
@@ -96,13 +133,13 @@ summary(activity)
 ##  3rd Qu.: 12.00                      3rd Qu.:1766.2  
 ##  Max.   :806.00                      Max.   :2355.0  
 ##  NA's   :2304                                        
-##    Date.Time                        time                    
-##  Min.   :2012-10-01 00:00:00   Min.   :2014-11-11 00:00:00  
-##  1st Qu.:2012-10-16 05:58:45   1st Qu.:2014-11-11 05:58:45  
-##  Median :2012-10-31 11:57:30   Median :2014-11-11 11:57:30  
-##  Mean   :2012-10-31 11:30:52   Mean   :2014-11-11 11:57:30  
-##  3rd Qu.:2012-11-15 17:56:15   3rd Qu.:2014-11-11 17:56:15  
-##  Max.   :2012-11-30 23:55:00   Max.   :2014-11-11 23:55:00  
+##    Date.Time                       Time          
+##  Min.   :2012-10-01 00:00:00   Length:17568      
+##  1st Qu.:2012-10-16 05:58:45   Class :character  
+##  Median :2012-10-31 11:57:30   Mode  :character  
+##  Mean   :2012-10-31 11:30:52                     
+##  3rd Qu.:2012-11-15 17:56:15                     
+##  Max.   :2012-11-30 23:55:00                     
 ## 
 ```
 
@@ -149,7 +186,7 @@ hist(activity_Agg$steps, main="Total Steps (NA Ignored)",xlab="Steps")
 hist(master_Agg$steps, main="Total Steps (NA Imputed)",xlab="Steps") 
 ```
 
-![plot of chunk unnamed-chunk-5](figure/unnamed-chunk-5-1.png) 
+![plot of chunk unnamed-chunk-8](figure/unnamed-chunk-8-1.png) 
 
 ```r
 #Display Mean and Median comparisons for both Imputed and previous datasets
@@ -170,28 +207,51 @@ Summaryresults                                                  #View results
 
 ## Are there differences in activity patterns between weekdays and weekends?
 
+To answer this question I first had to address the time formating issue. Interval cannot be used on the x axis as it is integer format and will not be accurate. Fir example the difference between 1155 and 1200 is 45 rather than 5 minutes. I take the following steps:
+
+1. Create a Date time variable using interval as the time stamp
+2. Create a Time variable using the strftime function
+
+The next step was to create a factor with two levels Weekday & Weekend. This is done using the weekdays() function
+Once this has been done I use the lattice package to display the outputs as a time series graph split by Weekday and Weekend
+
+
 
 ```r
 #----------------------------------------------------------------------------------------------------------
 ## Activity patterns between weekdays and weekends
 #----------------------------------------------------------------------------------------------------------
 
-library(lattice)
+master$Date.Time <-as.POSIXct(paste(master$date,substrRight(paste("0000",master$interval,sep=""),4)), format=dFormat)
+master$Time <-strftime(master$Date.Time, format="%H:%M:%S")
 
-
-activity$date <- as.Date(activity$date)
-weekend <- weekdays(activity$date) %in% c("Saturday","Sunday")
+#activity$date <- as.Date(activity$date)
+weekend <- weekdays(master$date) %in% c("Saturday","Sunday")
 weekend.f <- factor(weekend, labels = c("Weekday","Weekend"))
-activity$Weekday <- weekend.f
+master$Weekday <- weekend.f
 
 
-Weekday_Agg <- aggregate(steps ~ time + Weekday, data = activity,mean)
+Weekday_Agg <- aggregate(steps ~ Time + Weekday, data = master,mean)
+Weekday_Agg$steps <- round(Weekday_Agg$steps,4)
 
-xyplot(steps ~ time|Weekday,data=Weekday_Agg,type = "l",layout= c(1,2))
+Weekday_Agg$Time <- factor(Weekday_Agg$Time)
+
+at<- seq(1,nrow(Weekday_Agg),by=48)
+labels <-  Weekday_Agg$Time[seq(1,nrow(Weekday_Agg),by=48)]
+
+
+
+xyplot(steps ~ Time|Weekday,data=Weekday_Agg,type = "l",scales=list(x=list(at=at,labels=labels)),layout= c(1,2))
 ```
 
-![plot of chunk unnamed-chunk-6](figure/unnamed-chunk-6-1.png) 
+![plot of chunk unnamed-chunk-9](figure/unnamed-chunk-9-1.png) 
 
 ```r
 #----------------------------------------------------------------------------------------------------------
 ```
+
+We can see from this that the main differences appear to be 
+
+1. Weekday activity greater than Weekend in the 8am time region
+2. Greater midday activity during the Weekend
+3. Weekend activity greater than the Weekday in the 8pm time region
